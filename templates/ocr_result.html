@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Result</title>
+</head>
+<body>
+    <h1>OCR Result</h1>
+
+    <!-- 알약 텍스트 -->
+    <h2>Pill Text: {{ pill_text }}</h2>
+
+    <!-- 알약 색상 -->
+    <h2>Pill Color: {{ pill_color }}</h2>
+
+    <!-- 경계상자 좌표 -->
+    <h2>Bounding Box Coordinates:</h2>
+    <ul>
+        {% for coordinate in bounding_box %}
+            <li>{{ coordinate }}</li>
+        {% endfor %}
+    </ul>
+
+    <!-- 이미지 표시 -->
+    <img src="{{ image_url }}" alt="Processed Image">
+
+</body>
+</html>
