@@ -1,15 +1,15 @@
 import tempfile
-
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 import cv2
 import numpy as np
 import easyocr
 import matplotlib.pyplot as plt
 import re
 import os
+from flask_cors import CORS
 
 app = Flask(__name__)
-
+CORS(app)
 def clean_text(raw_text):
     # 정규 표현식을 사용하여 특수문자 제거
     cleaned_text = re.sub('[^a-zA-Z0-9가-힣\s]', '', raw_text)
@@ -45,7 +45,7 @@ def preprocess_image(image):
     # 글자 강조 (CLAHE를 사용하여 지역적인 대비 향상)
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # clipLimit를 조정하여 대비를 낮춤
-    clahe = cv2.createCLAHE(clipLimit=38.0, tileGridSize=(10, 10))
+    clahe = cv2.createCLAHE(clipLimit=30.0, tileGridSize=(10, 10))
     enhanced_image = clahe.apply(gray_image)
 
     # 전경에 대해서만 CLAHE 적용
@@ -64,7 +64,7 @@ def preprocess_image(image):
 
     return morph_image
 
-def identify_pill_text(image_path, ocr_languages=['en', 'ko']):
+def identify_pill_text(image_path, ocr_languages=['en']):
     # 이미지 불러오기
     original_image = cv2.imread(image_path)
 
@@ -78,6 +78,7 @@ def identify_pill_text(image_path, ocr_languages=['en', 'ko']):
     ocr_result = reader.readtext(processing_image)
 
     concatenated_text = ""
+    confidence_scores = []
 
     for detection in ocr_result:
         # 특수문자 처리를 추가하여 텍스트 정제
@@ -92,8 +93,13 @@ def identify_pill_text(image_path, ocr_languages=['en', 'ko']):
         print(f"신뢰도: {detection[2]}")
         print("-" * 20)
 
+        confidence_scores.append(detection[2])
+
     # 전체 텍스트 출력
     print("전체 텍스트:", concatenated_text)
+
+    # 평균 신뢰도 계산
+    average_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0
 
     # 원본 이미지 표시
     plt.subplot(1, 2, 1)
@@ -122,7 +128,7 @@ def identify_pill_text(image_path, ocr_languages=['en', 'ko']):
     # 저장된 이미지의 경로를 반환
     image_url = f'/static/{original_filename}_extracted_text_image.jpg'
 
-    return concatenated_text, image_url
+    return concatenated_text, image_url, average_confidence
 
 def identify_pill_color(image_path):
     # 이미지 불러오기
@@ -162,10 +168,10 @@ def identify_pill_color(image_path):
 def index():
     return render_template('file_upload2.html')
 
-@app.route('/ocr', methods=['POST'])
+@app.route('/api/flask/ocr', methods=['POST'])
 def ocr():
     if 'image' not in request.files:
-        return render_template('file_upload2.html', error='No image provided')
+        return jsonify({'error': 'No image provided'})
 
     image = request.files['image']
 
@@ -178,11 +184,20 @@ def ocr():
     original_filename = image.filename
 
     # 알약 텍스트, 색상, 경계상자 좌표 식별
-    pill_text, image_url = identify_pill_text(temp_filename)
+    pill_text, image_url, confidence = identify_pill_text(temp_filename)
     pill_color = identify_pill_color(temp_filename)
 
-    # 결과를 템플릿에 전달하여 웹 페이지에 표시
-    return render_template('ocr_result.html', pill_text=pill_text, pill_color=pill_color, image_url=image_url)
+    # JSON 응답 생성
+    response_data = {
+        'pill_text': pill_text,
+        'pill_color': pill_color,
+        'image_url': image_url,
+        'confidence': confidence
+    }
+
+    return jsonify(response_data)
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
