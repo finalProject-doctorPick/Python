@@ -238,4 +238,4 @@ def ocr():
     return jsonify(response_data)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='118.217.203.48', debug=True)
